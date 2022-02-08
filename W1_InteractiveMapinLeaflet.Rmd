@@ -1,0 +1,112 @@
+---
+title: "W1 - Interactive Map in Leaflet"
+author: "Agnes Boel Nielsen"
+date: "2/2/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+**Problem 1: Describe a problem or question in your field that lends itself to spatial analysis**
+
+Spatial analysis could be used to study the use of a dialect form versus a standard form in a given region, e.g. the use of *bette* versus *lille* ('small') in the North of Jutland. You could include an element of time to see whether there has been a change in the use of the form.
+
+
+You could also use spatial analysis in a study on linguistic landscape in a given area. Linguistic landscape is the study of "visibility and salience of languages on public and commercial signs in a given territory or region" (Wikipedia). Using GIS you could create an interactive map of the different data point including pictures, languages displayed, context (e.g. commercial, street sign etc.) and more. This kind of study is especially interesting in multilingual areas.
+
+**Problem 2: List data layers that you think are necessary to answer your question/solve your problem. Describe examples of two or three of your listed layers and see if you can find them on the internet**
+
+For the first topic, you would need to do a survey of language use in the area. You could e.g. ask people which zip code they reside in (and also which zip code they were born in) and whether they use *bette* or *lille* more. You would also need to gather information about other demographic, cultural, and socioeconomic variables which may affect language use (like class, level of education, gender, age etc.). *I do not think there is data on this area yet*.
+
+Examples of previous studies on dialect change using GIS:
+
+- Ayad, Y. & H. Luthin (2009). Mapping Dialect: GIS Applications in Studying Dialect of Western Pennsylvania. In: *The 2009 ESRI International User Conference Proceedings, 13 - 17 July, San Diego, California, USA; 2009*, pp. 1-26, Available at:
+http://proceedings.esri.com/library/userconf/proc09/uc/papers/pap_1686.pdf.
+- Teerarojanarat, S. & K. Tingsabadh (2011). Using GIS for Linguistic Study: A Case of Dialect Change in the Northeastern Region of Thailand. *Procedia - Social and Behavioral Sciences*, 21, pp. 362-371. Available at: https://www.sciencedirect.com/science/article/pii/S1877042811013383).
+
+
+For linguistic landscape, you would need locations for your finds, pictures, field notes about context and languages used. *Depending on what area you choose to study, there might be data out there to use*.
+
+Examples of previous papers on linguistic landscape and GIS:
+
+- Cocq, C., L. Granstedt, E. Lindgren, & U. Lindgren (2021). Digital Maps for Linguistic Diversity. *2865*. 224-229. Available at: https://www.researchgate.net/publication/352282525_Digital_Maps_for_Linguistic_Diversity.
+- Wrisley, D. J. (2020). Digital Spatial Practices and Linguistic Landscaping in Beirut. *ILCEA*, 39, pp. 1-22. Available at: https://journals.openedition.org/ilcea/9198. 
+
+
+**Problem 3 (option 1): Your colleague has found some ruins during a hike in the Blue Mountains and recorded the coordinates of structures on her phone (`RCFeature2018.csv`). She would like to map her points but has no computer or mapping skills. Can you make a map that she can work with using only a browser? She needs an interactive map that she can download to her computer and use straightaway**
+
+We first load the relevant packages.
+```{r}
+library(leaflet)
+library(tidyverse)
+```
+
+Then we load the table of points filtering out NA's from the `Longitude` and `Latitude`-columns.
+```{r}
+ruins <- read.csv("data/RCFeature2018.csv") %>%
+  filter(!is.na(Longitude)) %>%
+  filter(!is.na(Latitude))
+  
+head(ruins)
+```
+
+To display information from both the `FeatureID`, `FeatureType`, `Description`, and `Accuracy`-columns in the popup, we first concatenate the text from the three columns into a new column called `popup`. The text is separated by a line break and a small description is added before the text. In order to also present some of the information in a label when hovering the cursor over the points, another column, called `label` is added to the data frame. Here the information is simply seperated by a comma, and the `Accuracy` information is also omitted.
+```{r}
+ruins$popup <- paste(sep = "",
+  "Feature ID: ", ruins$FeatureID, "<br/>",
+  "Feature Type: ", ruins$FeatureType, "<br/>",
+  "Description: ", ruins$Description, "<br/>",
+  "Accuracy Level: ", ruins$Accuracy)
+
+ruins$label <- paste(sep = ", ",
+                       ruins$FeatureID,
+                       ruins$FeatureType,
+                       ruins$Description)
+```
+(From: https://rstudio.github.io/leaflet/popups.html)
+
+Because I want to make my markers' sizes depend on their accuracy level and because there is a big different in the accuracy values (with the smallest value at 0.6 and the largest at 16), I create a sort of rank so that values >0 & <=1 are given the rank 1, values >1 & <=6 are given the rank 4, and values >6 are given the rank 6.
+```{r}
+ruins <- ruins %>%
+  dplyr::mutate(accuracy.rank = cut(Accuracy,c(0, 1, 6, 16),
+                                     labels = c("2", "4", "6")))
+```
+(From: https://rstudio.github.io/leaflet/showhide.html)
+
+Now, we use Leaflet to plot the data points as circles on a map. The radius of the circles depend on their accuracy rank (the higher the rank, the bigger the circle). When you hover your cursor over a given circle you are given the find's feature ID, feature type and a small description of it, and when you click on the point a popup is shown, listing the same information as well as the specific accuracy level of the find.
+```{r}
+ruins_map <- leaflet() %>% 
+  addTiles() %>% 
+  addProviderTiles("Esri.WorldTopoMap", group = "Topographic") %>%
+  addProviderTiles("Esri.DeLorme", group = "DeLorme Topographic") %>%
+  addCircleMarkers(lng = ruins$Longitude,
+                   lat = ruins$Latitude,
+                   popup = ruins$popup,
+                   label = ruins$label,
+                   stroke = TRUE, fillOpacity = 0.5,
+                   radius = ruins$accuracy.rank) %>% 
+  addLayersControl(
+    baseGroups = c("DeLorme Topographic","Topographic"),
+    options = layersControlOptions(collapsed = F)
+    ) %>%
+  addMiniMap(tiles = providers$Esri.WorldTopoMap,
+             toggleDisplay = TRUE,
+             position = "bottomright") %>% 
+  addMeasure(
+    position = "bottomleft",
+    primaryLengthUnit = "meters",
+    primaryAreaUnit = "sqmeters",
+    activeColor = "#3D535D",
+    completedColor = "#7D4479")
+
+ruins_map
+```
+
+
+**Shortly on why I did not chose to cluster the markers here**: As the points were very close to each other, clustering did not work. When clicking on a cluster, it spread the points out in a spiral making it seem like the findings were placed in that shape. So, I kept the separate points here to keep the individual points in my map.
+
+
+I saved the map as an HTML using the `htmlwidgets`-package in a separate R script as it did not work i R Markdown. I used the following code: `saveWidget(ruins_map, "Blue Mountain hike map.html", selfcontained = TRUE)`. The link to the map is here: file:///Users/agnesboelnielsen/Documents/RStudio/cds-spatial-main/Week01/Blue%20Mountain%20hike%20map.html.
+
