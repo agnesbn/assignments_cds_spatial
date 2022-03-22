@@ -1,0 +1,83 @@
+---
+title: "Week 8 – Homework"
+author: "Agnes Boel Nielsen"
+date: "22/03/2022 updated`r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(spatstat)
+```
+
+# Exercise 1, Task 7: Point Pattern testing
+
+Two `ppp` objects have been created called `p1` and `p2` in your /data folder. Test if they are clustered or regular, and select the right answer. You'll need to run `quadrat.test` four times, once for each process with each hypothesis.
+
+### Possible Answers
+
+1. p1 is regular, p2 is regular
+2. p1 is regular, p2 is clustered 
+3. **p1 is clustered, p2 is clustered** <-- This is the correct answer!
+4. p1 is clustered, p2 is regular
+
+```{r testing,eval= FALSE}
+p1 <- readRDS("../data/p1.rds")
+p2 <- readRDS("../data/p2.rds")
+
+plot(p1)
+plot(p2)
+
+quadrat.test(p1, alternative = "clustered") # 0.02461
+quadrat.test(p1, alternative = "regular") # 0.9754
+quadrat.test(p2, alternative = "clustered") # 0.00062
+quadrat.test(p2, alternative = "regular") # 0.9994
+```
+
+# Exercise 2, Task 3: Tree location pattern
+
+
+Load a `ppp` object called `redoak` which contains the locations of trees in a woodland. Plot the tree locations and then test the hypothesis that the points are clustered against a *null hypothesis of a random uniform distribution*.
+
+## Possible Answers
+
+* I cannot reject the null hypothesis. 
+* I can reject the null hypothesis with p-value less than 0.1 
+* **I can reject the null hypothesis with p-value less than 0.01** <-- This is the answer! The p-value from the quadrat test is 4.477e-07, i.e. <0.01. 
+
+### Hint: check out the measure from the first exercise 
+```{r Tree location pattern}
+# Load the object
+redoak <- readRDS("../data/redoak.rds")
+
+# Plot the tree locations
+plot(redoak)
+
+# Nearest neighbour
+nnd_redoak <- nndist(redoak)
+
+# Histogram
+hist(nnd_redoak)
+
+# Plot
+G_redoak <- Gest(redoak)
+plot(G_redoak)
+
+# K-function
+K_redoak <- Kest(redoak, correction = "border")
+
+# Plot the K function with the default formula
+plot(K_redoak, . ~ r)
+
+# Plot the K function with a formula that subtracts the theoretical Poisson value
+plot(K_redoak, . - pi * r ^ 2 ~ r)
+
+# Simulation envelope with a formula that subtracts the theoretical Poisson value
+K_redoak_env <- envelope(redoak, Kest, correction = "border")
+plot(K_redoak_env, . - pi * r^2 ~ r)
+
+# Quadrat test
+quadrat.test(redoak, alternative = "clustered")
+```
